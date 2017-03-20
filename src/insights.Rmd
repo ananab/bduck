@@ -1,19 +1,22 @@
+---
+title: "Blackduck workshop challenge"
+output: pdf_document
+---
 
-
-```{r}
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.align="center")
 
 library(feather)
 library(tidyverse)
-library(mclust)
-library(cluster)
 
-data <- read_feather("results/data.feather")
 
 ```
 
-### What's the most common license id
+### the most common license ids
 
 ```{r}
+data <- read_feather("../results/data.feather")
+
 top_lic <- data %>% 
   group_by(license_id) %>% 
   summarise(num = n()) %>% 
@@ -23,8 +26,8 @@ top_lic <- data %>%
 head(top_lic,10)
 ```
 
-### What's the most popular project? 
-#### ranked by how many copies are in the dataset for each open source project id
+## Insight: the most popular projects? 
+### ranked by how many copies are in the dataset for each open source project id
 
 ```{r}
 
@@ -40,14 +43,16 @@ head(top_lic,10)
 
 ```{r}
 
-data %>% 
+(data %>% 
   filter(d_r_uuid %in% top_uuid$d_r_uuid) %>% 
   group_by(d_r_uuid,version) %>% 
   summarise(num = n()) %>% 
-  arrange(desc(num))
+  arrange(desc(num)))
 
   
 ```
+
+Note that the number of copies for the "most popular version" of each top project is the same with the total number of that project, as shown in the previous table.
 
 ## Insight: Each d_r_uuid (open source project id) is associated with a unique version of a project. In other words, different versions of the same project will have different open source project ids.
 
@@ -78,23 +83,49 @@ data_freq <- combined %>%
 ```
 
 
+show most common dws
+
 ```{r}
 combined %>% 
   arrange(desc(dwsfreq)) %>% 
+  select(dws,dns,so,license_id) %>% 
   head(10)
+```
 
+show most common dns
+```{r}
 combined %>% 
   arrange(desc(dnsfreq)) %>% 
+  select(dws,dns,so,license_id) %>% 
   head(10)
 
+
+
+```
+
+show most common so
+```{r}
 combined %>% 
   arrange(desc(sofreq)) %>% 
+  select(dws,dns,so,license_id) %>% 
   head(10)
 
+
+
+```
+
+## Insight: All of the most common dws, and dns have a common so.
+
+To examine this further:
+
+```{r}
 combined %>% 
-  arrange(desc(licfreq)) %>% 
-  head(10)
+  group_by(so,dns,dws) %>% 
+  summarise(num = n()) %>% 
+  arrange(desc(num)) %>% 
+  nrow()
 
+nlevels(as.factor(data$dws))
 ```
 
 ```{r}
@@ -102,7 +133,55 @@ combined %>%
   group_by(so,dns) %>% 
   summarise(num = n()) %>% 
   arrange(desc(num)) %>% 
-  View()
+  nrow()
+
+nlevels(as.factor(data$dns))
+```
+
+```{r}
+combined %>% 
+  group_by(so) %>% 
+  summarise(num = n()) %>% 
+  arrange(desc(num)) %>% 
+  nrow()
+
+nlevels(as.factor(data$so))
+```
+
+## Insight: There is a hierachical relationship among the features. Two projects with the same dws cannot have different dns or so's. Two projects with the same dns cannot have different so's. 
+
+The interpretation of this could be that so is the socket number on a server level. One so can be connected to many dns, which is the domain name services on an ip level. Finally, each ip can be associated with multiple dws.
+
+Knowing this, the same project tend to have the same dws. Different projects can be connected by the same dns, or the same so.
+
+## Insight: the "largest"" project with the most common dws is:
+```{r}
+top_dws <- combined %>% 
+  arrange(desc(dwsfreq)) %>% 
+  select(dws,dwsfreq)
+
+head(top_dws,1)
+
+```
+
+it has 33 versions:
+
+```{r}
+combined %>% 
+  filter(dws == top_dws$dws[1]) %>% 
+  group_by(version) %>% 
+  summarise(num = n()) %>% 
+  arrange(desc(num))
+```
+
+and used 23 licenses
+
+```{r}
+combined %>% 
+  filter(dws == top_dws$dws[1]) %>% 
+  group_by(license_id) %>% 
+  summarise(num = n()) %>% 
+  arrange(desc(num))
 ```
 
 
