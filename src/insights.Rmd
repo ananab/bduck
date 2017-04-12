@@ -192,7 +192,7 @@ for(i in 1:n){
   so1 <- sos[[i]][1]
   for(j in 1:n){
     so2 <- sos[[j]][1]
-    distance_matrix[i,j] <- length(intersect(so1$so,so2$so))
+    distance_matrix[i,j] <- (nrow(so1)+nrow(so2))/length(intersect(so1$so,so2$so))
   }
 }
 
@@ -209,23 +209,59 @@ plot(hc)
 -----
 
 ```{r}
-filter(short_data,d_r_uuid %in% short_list[which(cutree(hc,3)==1)]) %>% 
-  group_by(license_id) %>%   summarise(occur = n())
+# cut the projects into 2 clusters
+clusters <- cutree(hc,2)
+# function to examine each cluster
+# input: cluster number as int, feature interested as string
+# output: top 10 interested features in current cluster
+top_feature <- function(cluster,feature){
+  cluster_index <- which(clusters == cluster)
+  colNums <- match(feature,names(short_data))
+  
+  tops <- short_data %>% filter(d_r_uuid %in% short_list[cluster_index]) %>% 
+    group_by(.[[colNums]]) %>% summarise(occur = n()) %>%
+    arrange(desc(occur)) %>% head(10)
+  names(tops)[1] <- feature
+  return(tops)
+}
 ```
 
 -----
 
 ```{r}
-filter(short_data,d_r_uuid %in% short_list[which(cutree(hc,3)==2)]) %>% 
-  group_by(license_id) %>%   summarise(occur = n())
+top_feature(1,"license_id")
 ```
 
 -----
 
 ```{r}
-filter(short_data,d_r_uuid %in% short_list[which(cutree(hc,3)==3)]) %>% 
-  group_by(license_id) %>%   summarise(occur = n())
+top_feature(2,"license_id")
 ```
+
+-----
+
+```{r}
+top_feature(1,"dns")
+```
+
+-----
+
+```{r}
+top_feature(2,"dns")
+```
+
+-----
+
+```{r}
+top_feature(1,"version")
+```
+
+-----
+
+```{r}
+top_feature(1,"version")
+```
+
 
 ## Thank You!
 
