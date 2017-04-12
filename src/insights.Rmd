@@ -1,60 +1,58 @@
 ---
 title: "Blackduck workshop challenge"
-output: pdf_document
+author: Hatice Cavusoglu | Kai He
+date: Apr 12th, 2017
+output: ioslides_presentation
 ---
 
-```{r setup, include=FALSE}
+slides > slide.backdrop {
+  background: white;
+}
+
+```{r setup, warning=FALSE,echo=FALSE,results='hide',message=FALSE}
 knitr::opts_chunk$set(echo = TRUE, fig.align="center")
 
 library(feather)
 library(tidyverse)
-
-
+library(mclust)
+library(cluster)
+library(knitr)
+data <- read_feather("../results/data.feather")
 ```
+
+-----
 
 ### the most common license ids
 
 ```{r}
-data <- read_feather("../results/data.feather")
-
-top_lic <- data %>% 
-  group_by(license_id) %>% 
-  summarise(num = n()) %>% 
-  arrange(desc(num))
-
-
-head(top_lic,10)
+top_lic <- data %>%   group_by(license_id) %>% 
+  summarise(num = n()) %>%   arrange(desc(num))
+head(top_lic,5)
 ```
 
-## Insight: the most popular projects? 
-### ranked by how many copies are in the dataset for each open source project id
-
+## Insight: 
+- the most popular projects
+- ranked by number of copies in the dataset for each open source project id (uuid)
 ```{r}
-
-(top_uuid <- data %>% 
-  group_by(d_r_uuid) %>% 
-  summarise(num = n()) %>% 
-  arrange(desc(num)) %>% 
-  head(10))
-
+(top_uuid <- data %>%   group_by(d_r_uuid) %>% 
+  summarise(num = n()) %>%   arrange(desc(num)) %>% 
+  head(5))
 ```
 
-### What's the most popular version for each of the top projects?
+## Most popular version for each of the top projects
 
 ```{r}
-
-(data %>% 
-  filter(d_r_uuid %in% top_uuid$d_r_uuid) %>% 
-  group_by(d_r_uuid,version) %>% 
-  summarise(num = n()) %>% 
+(data %>%   filter(d_r_uuid %in% top_uuid$d_r_uuid) %>% 
+  group_by(d_r_uuid,version) %>%   summarise(num = n()) %>% 
   arrange(desc(num)))
-
-  
 ```
-
 Note that the number of copies for the "most popular version" of each top project is the same with the total number of that project, as shown in the previous table.
 
-## Insight: Each d_r_uuid (open source project id) is associated with a unique version of a project. In other words, different versions of the same project will have different open source project ids.
+## Insight: 
+- Each d_r_uuid (open source project id) is associated with a unique version of a project. 
+- In other words, different versions of the same project will have different open source project ids.
+
+-----
 
 combine levels based on their occurring frequency in the dataset.
 
@@ -72,117 +70,163 @@ names(so_freq) <- c("so","sofreq")
 
 lic_freq <- as.data.frame(table(data$license_id))
 names(lic_freq) <- c("license_id","licfreq")
+```
 
+-----
+
+```{r}
 combined <- inner_join(dws_freq,data,by="dws")
 combined <- inner_join(dns_freq,combined,by = "dns")
 combined <- inner_join(so_freq,combined,by = "so")
 combined <- inner_join(lic_freq,combined,by = "license_id")
-
-data_freq <- combined %>% 
-  select(d_r_uuid, version, dwsfreq, dnsfreq, sofreq, licfreq)
+head(combined,3)
 ```
 
+-----
 
 show most common dws
-
 ```{r}
-combined %>% 
-  arrange(desc(dwsfreq)) %>% 
-  select(dws,dns,so,license_id) %>% 
-  head(10)
+combined %>%   arrange(desc(dwsfreq)) %>%
+  select(dws,dns,so,license_id) %>%   head(5)
 ```
+
+-----
 
 show most common dns
 ```{r}
-combined %>% 
-  arrange(desc(dnsfreq)) %>% 
-  select(dws,dns,so,license_id) %>% 
-  head(10)
-
-
-
+combined %>%   arrange(desc(dnsfreq)) %>%
+  select(dws,dns,so,license_id) %>%   head(5)
 ```
+
+-----
 
 show most common so
 ```{r}
-combined %>% 
-  arrange(desc(sofreq)) %>% 
-  select(dws,dns,so,license_id) %>% 
-  head(10)
-
-
-
+combined %>%   arrange(desc(sofreq)) %>%
+  select(dws,dns,so,license_id) %>%   head(5)
 ```
 
-## Insight: All of the most common dws, and dns have a common so.
+## Insight: 
+- All of the most common dws, and dns have a common so.
+
+-----
 
 To examine this further:
 
 ```{r}
-combined %>% 
-  group_by(so,dns,dws) %>% 
-  summarise(num = n()) %>% 
-  arrange(desc(num)) %>% 
-  nrow()
-
+combined %>%   group_by(so,dns,dws) %>%
+  summarise(num = n()) %>%   arrange(desc(num)) %>%  nrow()
 nlevels(as.factor(data$dws))
-```
-
-```{r}
-combined %>% 
-  group_by(so,dns) %>% 
-  summarise(num = n()) %>% 
-  arrange(desc(num)) %>% 
-  nrow()
-
+combined %>%   group_by(so,dns) %>%
+  summarise(num = n()) %>%   arrange(desc(num)) %>% nrow()
 nlevels(as.factor(data$dns))
 ```
 
+## Insight: 
+- There is a hierachical relationship among the features. 
+- Two projects with the same dws cannot have different dns or so's. 
+- Two projects with the same dns cannot have different so's.
+
+### interpretation:
+
+- `so` is the socket number on a server level. 
+- one `so` can be connected to many `dns`, which is the domain name services on an ip level. 
+- each `dns` can be associated with multiple `dws`.
+- the same project tend to have the same `dws`. Different projects can be connected by the same `dns`, or the same `so`.
+
+## Insight: 
+- the "largest" project with the most common dws is:
 ```{r}
-combined %>% 
-  group_by(so) %>% 
-  summarise(num = n()) %>% 
-  arrange(desc(num)) %>% 
-  nrow()
-
-nlevels(as.factor(data$so))
-```
-
-## Insight: There is a hierachical relationship among the features. Two projects with the same dws cannot have different dns or so's. Two projects with the same dns cannot have different so's. 
-
-The interpretation of this could be that so is the socket number on a server level. One so can be connected to many dns, which is the domain name services on an ip level. Finally, each ip can be associated with multiple dws.
-
-Knowing this, the same project tend to have the same dws. Different projects can be connected by the same dns, or the same so.
-
-## Insight: the "largest"" project with the most common dws is:
-```{r}
-top_dws <- combined %>% 
-  arrange(desc(dwsfreq)) %>% 
+top_dws <- combined %>%  arrange(desc(dwsfreq)) %>%
   select(dws,dwsfreq)
 
 head(top_dws,1)
-
 ```
 
-it has 33 versions:
+-----
 
+### it has 33 versions:
 ```{r}
-combined %>% 
-  filter(dws == top_dws$dws[1]) %>% 
-  group_by(version) %>% 
-  summarise(num = n()) %>% 
+combined %>%  filter(dws == top_dws$dws[1]) %>%
+  group_by(version) %>%  summarise(num = n()) %>%
   arrange(desc(num))
 ```
 
-and used 23 licenses
+-----
 
+### and used 23 licenses
 ```{r}
-combined %>% 
-  filter(dws == top_dws$dws[1]) %>% 
-  group_by(license_id) %>% 
-  summarise(num = n()) %>% 
+combined %>%  filter(dws == top_dws$dws[1]) %>%
+  group_by(license_id) %>%  summarise(num = n()) %>%
   arrange(desc(num))
 ```
 
+-----
 
+```{r}
+# sort data by occurrence of uuid (version)
+prj <- data %>%
+  group_by(d_r_uuid,version) %>%
+  summarise(total_num=n()) %>%
+  arrange(desc(total_num))
 
+# get top 100 uuids
+n <- 50
+short_list <- prj$d_r_uuid[1:n]
+
+# filter data for the n uuids
+short_data <- data %>%
+  filter(d_r_uuid %in% short_list)
+```
+
+-----
+
+```{r}
+# get so for the top n projects
+sos <- lapply(short_list, function(i) filter(short_data,d_r_uuid == i) %>% select(so) %>% unique())
+
+# initialize distance matrix
+distance_matrix <- matrix(nrow = n,ncol = n)
+# populate matrix by number of shared so as similarity
+for(i in 1:n){
+  so1 <- sos[[i]][1]
+  for(j in 1:n){
+    so2 <- sos[[j]][1]
+    distance_matrix[i,j] <- length(intersect(so1$so,so2$so))
+  }
+}
+
+# cluster using hierachical clustering
+hc <- hclust(as.dist(distance_matrix) )
+```
+
+-----
+
+```{r}
+plot(hc)
+```
+
+-----
+
+```{r}
+filter(short_data,d_r_uuid %in% short_list[which(cutree(hc,3)==1)]) %>% 
+  group_by(license_id) %>%   summarise(occur = n())
+```
+
+-----
+
+```{r}
+filter(short_data,d_r_uuid %in% short_list[which(cutree(hc,3)==2)]) %>% 
+  group_by(license_id) %>%   summarise(occur = n())
+```
+
+-----
+
+```{r}
+filter(short_data,d_r_uuid %in% short_list[which(cutree(hc,3)==3)]) %>% 
+  group_by(license_id) %>%   summarise(occur = n())
+```
+
+## Thank You!
+
+![](questions.jpg)

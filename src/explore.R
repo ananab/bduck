@@ -1,7 +1,5 @@
 library(feather)
 library(tidyverse)
-library(mclust)
-library(cluster)
 
 data <- read_feather("results/data.feather")
 
